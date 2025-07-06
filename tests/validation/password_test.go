@@ -79,6 +79,17 @@ func Test_Validation_Password_Length_TooSmall(t *testing.T) {
 	})
 }
 
+func Test_Validation_Password_UnauthorizedWords(t *testing.T) {
+	t.Run("Fail - Unit test: Use unauthorized word", func(t *testing.T) {
+		password := "Lolita"
+		passwordValidation := validation.NewPasswordValidation()
+		passwordValidation.SetUnauthorizedWords([]string{ "Emma", "Lolita" })
+		if passwordValidation.PasswordContainsUnauthorizedWord(password) != true {
+			t.Fatalf("Password %s contains an unauthorized word !", password)
+		}
+	})
+}
+
 func Test_Validation_Password_TableDriven(t *testing.T) {
 	tests := []struct {
 		testName          string
