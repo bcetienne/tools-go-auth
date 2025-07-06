@@ -39,6 +39,10 @@ func NewPasswordValidation() PasswordValidation {
 }
 
 func (pv *PasswordValidation) SetMinLength(minLength int) {
+	// Avoid skip the minimum security requirements
+	if minLength < 8 {
+		return
+	}
 	pv.minLength = minLength
 }
 
