@@ -7,7 +7,7 @@ type RefreshToken struct {
 	UserID         int       `json:"user_id"`
 	Token          string    `json:"token"`
 	ExpiresAt      time.Time `json:"expires_at"`
-	CreatedAt      time.Time `json:"created_at"`
+	CreatedAt      time.Time `json:"created_at,omitempty"`
 	RevokedAt      time.Time `json:"revoked_at,omitempty"`
 }
 

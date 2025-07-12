@@ -2,8 +2,10 @@ package auth
 
 import (
 	"database/sql"
+	"time"
 
 	"gitlab.com/bcstudio1/tools/go-auth/lib"
+	"gitlab.com/bcstudio1/tools/go-auth/model"
 )
 
 type RefreshTokenService struct {
@@ -61,7 +63,7 @@ func NewRefreshTokenService(db *sql.DB, config *lib.Config) (*RefreshTokenServic
 	if !exists {
 		// Create the table
 		query := `
-		CREATE TABLE refresh_token (
+		CREATE TABLE go_auth.refresh_token (
 			refresh_token_id SERIAL PRIMARY KEY,
 			user_id INT NOT NULL,
 			token VARCHAR NOT NULL,
@@ -70,9 +72,9 @@ func NewRefreshTokenService(db *sql.DB, config *lib.Config) (*RefreshTokenServic
 			revoked_at TIMESTAMPTZ,
 			UNIQUE(token)
 		);
-		COMMENT ON TABLE refresh_token IS 'Refresh tokens for user authentication';
-		CREATE INDEX idx_refresh_token_token ON refresh_token(token);
-		CREATE INDEX idx_refresh_token_expires_at ON refresh_token(expires_at);
+		COMMENT ON TABLE go_auth.refresh_token IS 'Refresh tokens for user authentication';
+		CREATE INDEX idx_refresh_token_token ON go_auth.refresh_token(token);
+		CREATE INDEX idx_refresh_token_expires_at ON go_auth.refresh_token(expires_at);
 		`
 		_, err = db.Exec(query)
 		if err != nil {
@@ -83,17 +85,49 @@ func NewRefreshTokenService(db *sql.DB, config *lib.Config) (*RefreshTokenServic
 	return service, nil
 }
 
-func (rts *RefreshTokenService) CreateRefreshToken(userID int) (string, error) {
+func (rts *RefreshTokenService) CreateRefreshToken(userID int) (*model.RefreshToken, error) {
+	query := `INSERT INTO go_auth.refresh_token (user_id, token, expires_at) VALUES ($1, $2, $3) RETURNING refresh_token_id`
+
+	// Parse duration from configuration
+	duration, err := time.ParseDuration(rts.config.RefreshTokenExpiry)
+	if err != nil {
+		return nil, err
+	}
+	expiresAt := time.Now().Add(duration)
+
+	// Create a random token
+	token, err := lib.GenerateRandomString(255)
+	if err != nil {
+		return nil, err
+	}
+
+	refreshToken := model.NewRefreshToken(userID, token, expiresAt)
+
+	row := rts.db.QueryRow(query, userID, token, expiresAt)
+	err = row.Scan(&refreshToken.RefreshTokenID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &refreshToken, nil
 }
 
 func (rts *RefreshTokenService) VerifyRefreshToken(token string) (int, error) {
+	query := ``
 }
 
 func (rts *RefreshTokenService) RevokeRefreshToken(token string, userID int) error {
+	query := `UPDATE go_auth.refresh_token SET revoked_at = NOW() WHERE user_id = $1 AND token = $2 AND revoked_at IS NULL`
 }
 
 func (rts *RefreshTokenService) RevokeAllUserRefreshTokens(userID int) error {
+	query := `UPDATE go_auth.refresh_token SET revoked_at = NOW() WHERE user_id = $1 AND revoked_at IS NULL`
 }
 
 func (rts *RefreshTokenService) FlushRefreshTokens() error {
+	query := `DELETE FROM go_auth.refresh_token`
+}
+
+func (rts *RefreshTokenService) FlushUserRefreshTokens(userID int) error {
+	query := `DELETE FROM go_auth.refresh_token WHERE user_id = $1`
 }
