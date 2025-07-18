@@ -62,7 +62,7 @@ func Test_Auth_AccessToken_CreateAccessToken_TableDriven(t *testing.T) {
 	}
 }
 
-func Test_Auth_AccessToken_VerifyAccessToken_TableDrive(t *testing.T) {
+func Test_Auth_AccessToken_VerifyAccessToken_TableDriven(t *testing.T) {
 	tests := []struct {
 		testName      string
 		token         string
@@ -144,8 +144,9 @@ func Test_Auth_AccessToken_VerifyAccessToken_Expired(t *testing.T) {
 			t.Fatalf("The test expect no error on access token creation, got : %v", err)
 		}
 
-		log.Printf("Sleeping test for 5 seconds...")
-		time.Sleep(5 * time.Second)
+		// Do not go under 5 seconds. The leeway authorize an expired token for 5 seconds after the expiration time
+		log.Printf("Sleeping test for 7 seconds...")
+		time.Sleep(7 * time.Second)
 
 		verified, err := accessTokenService.VerifyAccessToken(token)
 		if err == nil {
