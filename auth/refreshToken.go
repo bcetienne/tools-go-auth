@@ -2,6 +2,7 @@ package auth
 
 import (
 	"database/sql"
+	"errors"
 	"time"
 
 	"github.com/bcetienne/tools-go-auth/lib"
@@ -98,6 +99,10 @@ func NewRefreshTokenService(db *sql.DB, config *lib.Config) (*RefreshTokenServic
 
 // CreateRefreshToken creates a new refresh token for a user
 func (rts *RefreshTokenService) CreateRefreshToken(userID int) (*model.RefreshToken, error) {
+	if userID <= 0 {
+		return nil, errors.New("invalid user ID")
+	}
+
 	query := `INSERT INTO go_auth.refresh_token (user_id, token, expires_at) VALUES ($1, $2, $3) RETURNING refresh_token_id`
 
 	// Parse duration from configuration
@@ -121,7 +126,7 @@ func (rts *RefreshTokenService) CreateRefreshToken(userID int) (*model.RefreshTo
 		return nil, err
 	}
 
-	return &refreshToken, nil
+	return refreshToken, nil
 }
 
 // VerifyRefreshToken checks if a given refresh token is valid and not revoked.
