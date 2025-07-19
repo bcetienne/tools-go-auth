@@ -1,4 +1,4 @@
-module gitlab.com/bcstudio1/tools/go-auth
+module github.com/ton-username/go-auth
 
 go 1.24.4
 
