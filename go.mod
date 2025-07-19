@@ -1,4 +1,4 @@
-module github.com/ton-username/go-auth
+module github.com/bcetienne/tools-go-auth
 
 go 1.24.4
 

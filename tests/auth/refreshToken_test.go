@@ -3,18 +3,18 @@ package auth
 import (
 	"context"
 	"database/sql"
+	"github.com/bcetienne/tools-go-auth/auth"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
-	"gitlab.com/bcstudio1/tools/go-auth/auth"
 	"log"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/bcetienne/tools-go-auth/lib"
 	_ "github.com/lib/pq"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
-	"gitlab.com/bcstudio1/tools/go-auth/lib"
 )
 
 var (

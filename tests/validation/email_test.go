@@ -3,7 +3,7 @@ package validation
 import (
 	"testing"
 
-	"gitlab.com/bcstudio1/tools/go-auth/validation"
+	"github.com/bcetienne/tools-go-auth/validation"
 )
 
 func Test_Validation_Email_TableDriven(t *testing.T) {

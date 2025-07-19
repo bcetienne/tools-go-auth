@@ -4,8 +4,8 @@ import (
 	"database/sql"
 	"time"
 
-	"gitlab.com/bcstudio1/tools/go-auth/lib"
-	"gitlab.com/bcstudio1/tools/go-auth/model"
+	"github.com/bcetienne/tools-go-auth/lib"
+	"github.com/bcetienne/tools-go-auth/model"
 )
 
 type RefreshTokenService struct {

@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/bcetienne/tools-go-auth/lib"
+	"github.com/bcetienne/tools-go-auth/model"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
-	"gitlab.com/bcstudio1/tools/go-auth/lib"
-	"gitlab.com/bcstudio1/tools/go-auth/model"
 )
 
 type AccessTokenService struct {

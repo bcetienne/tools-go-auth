@@ -3,7 +3,7 @@ package validation
 import (
 	"testing"
 
-	"gitlab.com/bcstudio1/tools/go-auth/validation"
+	"github.com/bcetienne/tools-go-auth/validation"
 )
 
 func Test_Validation_Password_Lowercase(t *testing.T) {
@@ -83,7 +83,7 @@ func Test_Validation_Password_UnauthorizedWords(t *testing.T) {
 	t.Run("Fail - Unit test: Use unauthorized word", func(t *testing.T) {
 		password := "Lolita"
 		passwordValidation := validation.NewPasswordValidation()
-		passwordValidation.SetUnauthorizedWords([]string{ "Emma", "Lolita" })
+		passwordValidation.SetUnauthorizedWords([]string{"Emma", "Lolita"})
 		if passwordValidation.PasswordContainsUnauthorizedWord(password) != true {
 			t.Fatalf("Password %s contains an unauthorized word !", password)
 		}

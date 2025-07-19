@@ -2,10 +2,10 @@ package auth
 
 import (
 	"errors"
+	"github.com/bcetienne/tools-go-auth/auth"
+	"github.com/bcetienne/tools-go-auth/lib"
+	"github.com/bcetienne/tools-go-auth/model"
 	"github.com/golang-jwt/jwt/v5"
-	"gitlab.com/bcstudio1/tools/go-auth/auth"
-	"gitlab.com/bcstudio1/tools/go-auth/lib"
-	"gitlab.com/bcstudio1/tools/go-auth/model"
 	"log"
 	"testing"
 	"time"

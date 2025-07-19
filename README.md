@@ -29,7 +29,7 @@ A comprehensive authentication utility package for Go applications, providing se
 ## Installation
 
 ```bash
-go get gitlab.com/bcstudio1/tools/go-auth
+go get github.com/bcetienne/tools-go-auth
 ```
 
 ## Configuration
@@ -50,7 +50,7 @@ RefreshTokenExpiry: "7d",         // Refresh token expiry
 ### Password Hashing
 
 ```go
-import "gitlab.com/bcstudio1/tools/go-auth/lib"
+import "github.com/bcetienne/tools-go-auth/lib"
 
 // Create hasher
 hasher := lib.NewPasswordHash()
@@ -69,7 +69,7 @@ fmt.Println("Password valid:", isValid) // true
 ### Password Validation
 
 ```go
-import "gitlab.com/bcstudio1/tools/go-auth/validation"
+import "github.com/bcetienne/tools-go-auth/validation"
 
 // Create validator with defaults
 validator := validation.NewPasswordValidation()
@@ -90,7 +90,7 @@ hasDigit := validator.PasswordContainsDigit("test123")
 ### Email Validation
 
 ```go
-import "gitlab.com/bcstudio1/tools/go-auth/validation"
+import "github.com/bcetienne/tools-go-auth/validation"
 
 // Create email validator
 emailValidator := validation.NewEmailValidation()
@@ -104,8 +104,8 @@ fmt.Println("Email valid:", isValid) // true
 
 ```go
 import (
-"gitlab.com/bcstudio1/tools/go-auth/auth"
-"gitlab.com/bcstudio1/tools/go-auth/model"
+"github.com/bcetienne/tools-go-auth/auth"
+"github.com/bcetienne/tools-go-auth/model"
 )
 
 // Initialize service
@@ -134,7 +134,7 @@ fmt.Printf("User ID: %d\n", claims.UserID)
 ### Refresh Token Management
 
 ```go
-import "gitlab.com/bcstudio1/tools/go-auth/auth"
+import "github.com/bcetienne/tools-go-auth/auth"
 
 // Initialize service with database connection
 refreshTokenService, err := auth.NewRefreshTokenService(db, config)
@@ -170,7 +170,7 @@ log.Fatal(err)
 ### Random String Generation
 
 ```go
-import "gitlab.com/bcstudio1/tools/go-auth/lib"
+import "github.com/bcetienne/tools-go-auth/lib"
 
 // Generate secure random token
 token, err := lib.GenerateRandomString(32)

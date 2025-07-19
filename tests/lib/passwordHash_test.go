@@ -3,7 +3,7 @@ package lib
 import (
 	"testing"
 
-	"gitlab.com/bcstudio1/tools/go-auth/lib"
+	"github.com/bcetienne/tools-go-auth/lib"
 )
 
 func Test_Lib_PasswordHash_Hash(t *testing.T) {
