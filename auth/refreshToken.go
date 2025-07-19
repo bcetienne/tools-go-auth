@@ -14,7 +14,7 @@ type RefreshTokenService struct {
 }
 
 type RefreshTokenServiceInterface interface {
-	CreateRefreshToken(userID int) (string, error)
+	CreateRefreshToken(userID int) (*model.RefreshToken, error)
 	VerifyRefreshToken(token string) (*bool, error)
 	RevokeRefreshToken(token string, userID int) error
 	RevokeAllUserRefreshTokens(userID int) error
