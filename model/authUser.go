@@ -12,8 +12,8 @@ type AuthUserInterface interface {
 	GetUserUUID() string
 }
 
-func NewAuthUser(userID int, uuid, email string) AuthUser {
-	return AuthUser{
+func NewAuthUser(userID int, uuid, email string) *AuthUser {
+	return &AuthUser{
 		UserID:   userID,
 		UserUUID: uuid,
 		Email:    email,

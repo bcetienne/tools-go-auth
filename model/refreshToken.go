@@ -11,8 +11,8 @@ type RefreshToken struct {
 	RevokedAt      time.Time `json:"revoked_at,omitempty"`
 }
 
-func NewRefreshToken(userID int, token string, expiresAt time.Time) RefreshToken {
-	return RefreshToken{
+func NewRefreshToken(userID int, token string, expiresAt time.Time) *RefreshToken {
+	return &RefreshToken{
 		UserID:    userID,
 		Token:     token,
 		ExpiresAt: expiresAt,

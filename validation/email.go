@@ -19,8 +19,8 @@ type EmailValidationInterface interface {
 // email formats including alphanumeric characters, dots, underscores,
 // percent signs, plus signs, and hyphens in the local part, and
 // alphanumeric characters, dots, and hyphens in the domain part.
-func NewEmailValidation() EmailValidation {
-	return EmailValidation{
+func NewEmailValidation() *EmailValidation {
+	return &EmailValidation{
 		emailRegex: regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`),
 	}
 }

@@ -34,8 +34,8 @@ type PasswordValidationInterface interface {
 // The validator is initialized with a minimum length of 8 characters,
 // an empty unauthorized words list, and pre-compiled regex patterns
 // for optimal performance.
-func NewPasswordValidation() PasswordValidation {
-	passwordValidation := PasswordValidation{
+func NewPasswordValidation() *PasswordValidation {
+	passwordValidation := &PasswordValidation{
 		minLength:         8,
 		unauthorizedWords: []string{},
 		lowercaseRegex:    regexp.MustCompile(`[a-z]`),

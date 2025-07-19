@@ -22,8 +22,8 @@ type PasswordHashInterface interface {
 // The hasher uses bcrypt with a cost factor of 14, providing strong
 // protection against brute-force attacks while maintaining reasonable
 // performance for authentication operations.
-func NewPasswordHash() PasswordHash {
-	return PasswordHash{}
+func NewPasswordHash() *PasswordHash {
+	return &PasswordHash{}
 }
 
 // Hash generates a secure bcrypt hash of the provided password using

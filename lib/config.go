@@ -7,8 +7,8 @@ type Config struct {
 	RefreshTokenExpiry string
 }
 
-func NewConfig(issuer, JWTSecret, JWTExpiry, RefreshTokenExpiry string) Config {
-	return Config{
+func NewConfig(issuer, JWTSecret, JWTExpiry, RefreshTokenExpiry string) *Config {
+	return &Config{
 		Issuer:             issuer,
 		JWTSecret:          JWTSecret,
 		JWTExpiry:          JWTExpiry,
