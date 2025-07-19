@@ -16,17 +16,17 @@ type AccessTokenService struct {
 }
 
 type AccessTokenServiceInterface interface {
-	CreateAccessToken(user model.AuthUser) (string, error)
+	CreateAccessToken(user *model.AuthUser) (string, error)
 	VerifyAccessToken(token string) (*model.Claim, error)
 }
 
-func NewAccessTokenService(config *lib.Config) AccessTokenService {
-	return AccessTokenService{
+func NewAccessTokenService(config *lib.Config) *AccessTokenService {
+	return &AccessTokenService{
 		config: config,
 	}
 }
 
-func (at *AccessTokenService) CreateAccessToken(user model.AuthUser) (string, error) {
+func (at *AccessTokenService) CreateAccessToken(user *model.AuthUser) (string, error) {
 	duration, err := time.ParseDuration(at.config.JWTExpiry)
 	if err != nil {
 		return "", err
