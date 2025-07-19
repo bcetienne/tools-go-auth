@@ -211,3 +211,18 @@ func TestFlushUserRefreshTokens(t *testing.T) {
 		assert.Equal(t, 1, count2)
 	})
 }
+
+func TestVerifyRefreshToken(t *testing.T) {
+	service := setupService(t)
+	userID := 3
+
+	// Create a valid token
+	rt, err := service.CreateRefreshToken(userID)
+	require.NoError(t, err)
+
+	t.Run("should return true for a valid token", func(t *testing.T) {
+		exists, err := service.VerifyRefreshToken(rt.Token)
+		require.NoError(t, err)
+		assert.True(t, *exists)
+	})
+}

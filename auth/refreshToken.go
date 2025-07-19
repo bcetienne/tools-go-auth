@@ -15,7 +15,7 @@ type RefreshTokenService struct {
 
 type RefreshTokenServiceInterface interface {
 	CreateRefreshToken(userID int) (string, error)
-	//VerifyRefreshToken(token string) (int, error)
+	VerifyRefreshToken(token string) (*bool, error)
 	RevokeRefreshToken(token string, userID int) error
 	RevokeAllUserRefreshTokens(userID int) error
 	FlushRefreshTokens() error
@@ -124,9 +124,17 @@ func (rts *RefreshTokenService) CreateRefreshToken(userID int) (*model.RefreshTo
 	return &refreshToken, nil
 }
 
-//func (rts *RefreshTokenService) VerifyRefreshToken(token string) (int, error) {
-//	query := ``
-//}
+// VerifyRefreshToken checks if a given refresh token is valid and not revoked.
+func (rts *RefreshTokenService) VerifyRefreshToken(token string) (*bool, error) {
+	query := `SELECT EXISTS(SELECT refresh_token_id FROM go_auth.refresh_token WHERE token = $1 AND revoked_at IS NULL)`
+	row := rts.db.QueryRow(query, token)
+	var exists bool
+	err := row.Scan(&exists)
+	if err != nil {
+		return nil, err
+	}
+	return &exists, nil
+}
 
 // RevokeRefreshToken revokes a refresh token for a user
 func (rts *RefreshTokenService) RevokeRefreshToken(token string, userID int) error {
