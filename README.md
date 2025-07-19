@@ -1,11 +1,11 @@
 # Go Auth Package
 
-A comprehensive authentication utility package for Go applications, providing secure password validation, email validation, and cryptographic utilities.
+A comprehensive authentication utility package for Go applications, providing secure password validation, email validation, JWT token management, and cryptographic utilities.
 
 ## Features
 
 ### 🔐 Password Security
-- **Secure Hashing**: Bcrypt with cost factor 14
+- **Secure Hashing**: Bcrypt with configurable cost factor (default: 14)
 - **Comprehensive Validation**: Uppercase, lowercase, digits, special characters
 - **Configurable Requirements**: Minimum length, blacklisted words
 - **Built-in Protection**: Prevents weak passwords and common attack vectors
@@ -14,6 +14,12 @@ A comprehensive authentication utility package for Go applications, providing se
 - **RFC-Compliant**: Standard email format validation
 - **Performance Optimized**: Pre-compiled regex patterns
 - **Simple API**: Single function validation
+
+### 🎫 JWT Token Management
+- **Access Tokens**: Short-lived tokens for API authentication
+- **Refresh Tokens**: Long-lived tokens for session management with database persistence
+- **Secure Generation**: Uses HS256 signing with configurable secrets
+- **Token Verification**: Built-in validation with proper error handling
 
 ### 🎲 Cryptographic Utilities
 - **Secure Random Strings**: Uses `crypto/rand` for token generation
@@ -24,6 +30,19 @@ A comprehensive authentication utility package for Go applications, providing se
 
 ```bash
 go get gitlab.com/bcstudio1/tools/go-auth
+```
+
+## Configuration
+
+Create a configuration object with your settings:
+
+```go
+config := &lib.Config{
+Issuer:             "your-app.com",
+JWTSecret:          "your-secure-jwt-secret",
+JWTExpiry:          "15m",        // Access token expiry
+RefreshTokenExpiry: "7d",         // Refresh token expiry
+}
 ```
 
 ## Quick Start
@@ -39,7 +58,7 @@ hasher := lib.NewPasswordHash()
 // Hash password
 hash, err := hasher.Hash("MySecurePassword123!")
 if err != nil {
-    log.Fatal(err)
+log.Fatal(err)
 }
 
 // Verify password
@@ -81,6 +100,73 @@ isValid := emailValidator.IsValidEmail("user@example.com")
 fmt.Println("Email valid:", isValid) // true
 ```
 
+### Access Token Management
+
+```go
+import (
+"gitlab.com/bcstudio1/tools/go-auth/auth"
+"gitlab.com/bcstudio1/tools/go-auth/model"
+)
+
+// Initialize service
+accessTokenService := auth.NewAccessTokenService(config)
+
+// Create user model
+user := &model.AuthUser{
+UserID: 123,
+Email:  "user@example.com",
+}
+
+// Generate access token
+token, err := accessTokenService.CreateAccessToken(user)
+if err != nil {
+log.Fatal(err)
+}
+
+// Verify access token
+claims, err := accessTokenService.VerifyAccessToken(token)
+if err != nil {
+log.Fatal(err)
+}
+fmt.Printf("User ID: %d\n", claims.UserID)
+```
+
+### Refresh Token Management
+
+```go
+import "gitlab.com/bcstudio1/tools/go-auth/auth"
+
+// Initialize service with database connection
+refreshTokenService, err := auth.NewRefreshTokenService(db, config)
+if err != nil {
+log.Fatal(err)
+}
+
+// Create refresh token
+token, err := refreshTokenService.CreateRefreshToken(123) // user ID
+if err != nil {
+log.Fatal(err)
+}
+
+// Verify refresh token
+isValid, err := refreshTokenService.VerifyRefreshToken(token)
+if err != nil {
+log.Fatal(err)
+}
+
+// Revoke refresh token
+err = refreshTokenService.RevokeRefreshToken(token, 123)
+if err != nil {
+log.Fatal(err)
+}
+
+// Revoke all user's refresh tokens
+err = refreshTokenService.RevokeAllUserRefreshTokens(123)
+if err != nil {
+log.Fatal(err)
+}
+```
+
 ### Random String Generation
 
 ```go
@@ -89,12 +175,24 @@ import "gitlab.com/bcstudio1/tools/go-auth/lib"
 // Generate secure random token
 token, err := lib.GenerateRandomString(32)
 if err != nil {
-    log.Fatal(err)
+log.Fatal(err)
 }
 fmt.Println("Token:", token) // e.g., "A7xK9mP2nQ5rT8uW1vY4zB6cD0eF3gH5"
 ```
 
 ## API Reference
+
+### Configuration (`lib` package)
+
+#### `Config` struct
+```go
+type Config struct {
+Issuer             string // JWT issuer
+JWTSecret          string // Secret for signing JWTs
+JWTExpiry          string // Access token expiry duration
+RefreshTokenExpiry string // Refresh token expiry duration
+}
+```
 
 ### Password Hashing (`lib` package)
 
@@ -110,89 +208,123 @@ Verifies if password matches the hash. Returns false for empty inputs or invalid
 ### Password Validation (`validation` package)
 
 #### `NewPasswordValidation() PasswordValidation`
-Creates validator with secure defaults (8 char minimum, comprehensive rules).
+Creates a new password validator with default settings.
 
-#### Configuration Methods
-- `SetMinLength(minLength int)` - Set minimum length (min: 8 chars)
-- `SetUnauthorizedWords(words []string)` - Set password blacklist
+#### `IsPasswordStrengthEnough(password string) bool`
+Validates if password meets all strength requirements.
 
-#### Validation Methods
-- `IsPasswordStrengthEnough(password string) bool` - Complete validation
-- `PasswordContainsLowercase(password string) bool` - Check lowercase letters
-- `PasswordContainsUppercase(password string) bool` - Check uppercase letters
-- `PasswordContainsDigit(password string) bool` - Check numeric digits
-- `PasswordContainsSpecialChar(password string) bool` - Check special characters
-- `PasswordHasMinLength(password string) bool` - Check minimum length
-- `PasswordContainsUnauthorizedWord(password string) bool` - Check blacklist
+#### `PasswordContainsUppercase(password string) bool`
+Checks if password contains uppercase letters.
+
+#### `PasswordContainsLowercase(password string) bool`
+Checks if password contains lowercase letters.
+
+#### `PasswordContainsDigit(password string) bool`
+Checks if password contains numeric digits.
+
+#### `PasswordContainsSpecialChar(password string) bool`
+Checks if password contains special characters.
+
+#### `SetMinLength(length int)`
+Sets minimum required password length.
+
+#### `SetUnauthorizedWords(words []string)`
+Sets list of forbidden words in passwords.
 
 ### Email Validation (`validation` package)
 
 #### `NewEmailValidation() EmailValidation`
-Creates email validator with RFC-compliant regex.
+Creates a new email validator.
 
 #### `IsValidEmail(email string) bool`
-Validates email format. Returns true for valid emails.
+Validates email format against RFC standards.
 
-### Random Utilities (`lib` package)
+### Access Token Service (`auth` package)
 
-#### `GenerateRandomString(n int) (string, error)`
-Generates cryptographically secure random string of length n.
+#### `NewAccessTokenService(config *lib.Config) AccessTokenService`
+Creates a new access token service.
 
-Character set: `0-9A-Za-z-`
+#### `CreateAccessToken(user *model.AuthUser) (string, error)`
+Generates a JWT access token for the given user.
 
-## Security Features
+#### `VerifyAccessToken(token string) (*model.Claim, error)`
+Verifies and parses an access token, returning claims if valid.
 
-- **High-Cost Bcrypt**: Cost factor 14 provides strong protection against brute-force attacks
-- **Crypto-Secure Random**: Uses `crypto/rand` for token generation
-- **Input Validation**: Prevents empty passwords and invalid inputs
-- **Configurable Security**: Adjustable requirements while maintaining baseline security
-- **Salt Generation**: Automatic salt generation ensures unique hashes
+### Refresh Token Service (`auth` package)
 
-## Best Practices
+#### `NewRefreshTokenService(db *sql.DB, config *lib.Config) (*RefreshTokenService, error)`
+Creates a new refresh token service with database support. Automatically creates required schema and tables.
 
-### Password Security
+#### `CreateRefreshToken(userID int) (string, error)`
+Generates a new refresh token for the user and stores it in the database.
+
+#### `VerifyRefreshToken(token string) (*bool, error)`
+Verifies if a refresh token exists and is valid in the database.
+
+#### `RevokeRefreshToken(token string, userID int) error`
+Revokes a specific refresh token for a user.
+
+#### `RevokeAllUserRefreshTokens(userID int) error`
+Revokes all refresh tokens for a specific user.
+
+#### `FlushRefreshTokens() error`
+Removes all expired refresh tokens from the database.
+
+### Random String Generation (`lib` package)
+
+#### `GenerateRandomString(length int) (string, error)`
+Generates a cryptographically secure random string of specified length using alphanumeric characters and hyphens.
+
+## Models
+
+### AuthUser (`model` package)
 ```go
-// ✅ Good: Strong validation
-validator := validation.NewPasswordValidation()
-validator.SetMinLength(12)
-validator.SetUnauthorizedWords([]string{"password", "admin"})
-
-// ✅ Good: Always check errors
-hash, err := hasher.Hash(password)
-if err != nil {
-    return fmt.Errorf("hashing failed: %w", err)
+type AuthUser struct {
+UserID   int    `json:"user_id"`
+UserUUID string `json:"user_uuid"`
+Email    string `json:"email"`
 }
 ```
 
-### Token Generation
+### Claim (`model` package)
 ```go
-// ✅ Good: Sufficient length for security
-sessionToken, err := lib.GenerateRandomString(32)
-refreshToken, err := lib.GenerateRandomString(64)
-
-// ✅ Good: Always handle crypto errors
-if err != nil {
-    return fmt.Errorf("token generation failed: %w", err)
+type Claim struct {
+KeyType string `json:"key_type"` // "access" or "refresh"
+UserID  int    `json:"user_id"`
+jwt.RegisteredClaims
 }
+```
+
+## Database Requirements
+
+The refresh token service requires a PostgreSQL database. The service will automatically create the required schema and table:
+
+```sql
+-- Schema: auth_module (created automatically)
+-- Table: refresh_tokens (created automatically)
 ```
 
 ## Testing
 
-The package includes comprehensive test coverage for all components:
+The package includes comprehensive tests with PostgreSQL test containers.
+
+**Requirements:**
+- Docker must be installed and running on your system
 
 ```bash
 go test ./...
 ```
 
-## Requirements
+The tests automatically start a PostgreSQL container using _testcontainers-go_, so no manual database setup is required.
 
-- Go 1.21+
-- Dependencies: `golang.org/x/crypto/bcrypt`
+## Security Considerations
+
+- **JWT Secrets**: Use strong, unique secrets for JWT signing
+- **Token Expiry**: Set appropriate expiry times for access and refresh tokens
+- **Password Hashing**: Uses bcrypt with cost factor 14 for secure password storage
+- **Random Generation**: All random strings use `crypto/rand` for cryptographic security
+- **Database Security**: Refresh tokens are stored securely with proper indexing
 
 ## License
 
-Private package - internal use only.
-
-## Contributing
-
-This is a private utility package. For issues or feature requests, contact the development team.
+This project is part of the BcStudio1 tools collection.
