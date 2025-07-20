@@ -8,7 +8,14 @@ stages:
   stage: lint
   image: golangci/golangci-lint:v1.59.1
   script:
+    - go mod download
     - golangci-lint run -v
+  cache:
+    key:
+      files:
+        - go.sum
+    paths:
+      - /go/pkg/mod
 
 🧪 Tests:
   stage: test
