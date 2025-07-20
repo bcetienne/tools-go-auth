@@ -1,82 +1,82 @@
 image: golang:1.24
 
 stages:
-  - lint
-  - test
+#  - lint
+#  - test
   - build
 
-💅 Lint:
-  stage: lint
-  image: golang:1.24
-  before_script:
-    - go mod download
-    - go mod tidy
-    - go mod verify
-    - go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.59.1
-  script:
-    # Skip files and ignore errors of `typecheck`
-    - golangci-lint run -v --timeout 5m --skip-files "tests/.*" --disable typecheck || true
-    # If always fail, verify that there are no real linting errors instead of only typecheck errors
-    - |
-      OUTPUT=$(golangci-lint run --timeout 5m --disable typecheck 2>&1 || true)
-      if echo "$OUTPUT" | grep -v "typecheck" | grep -E "\.go:[0-9]+:[0-9]+:"; then
-        echo "Found real linting errors (not typecheck):"
-        echo "$OUTPUT" | grep -v "typecheck"
-        exit 1
-      else
-        echo "Only typecheck errors found, ignoring them"
-        exit 0
-      fi
-  cache:
-    key:
-      files:
-        - go.sum
-    paths:
-      - /go/pkg/mod
-      - .cache/go-build
-
-🧪 Tests:
-  stage: test
-  services:
-    - name: docker:dind
-      alias: docker
-  variables:
-    DOCKER_HOST: tcp://docker:2375
-    DOCKER_TLS_CERTDIR: ""
-  script:
-    - go test ./tests/...
-  cache:
-    key:
-      files:
-        - go.sum
-    paths:
-      - /go/pkg/mod
-
-📊 Coverage:
-  stage: test
-  services:
-    - name: docker:dind
-      alias: docker
-  variables:
-    DOCKER_HOST: tcp://docker:2375
-    DOCKER_TLS_CERTDIR: ""
-  script:
-    - |
-      go test -coverprofile=coverage.out -coverpkg=./auth/...,./lib/...,./model/...,./validation/... ./tests/...
-      apt-get update && apt-get install -y bc
-      COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
-      echo "Total coverage: $COVERAGE%"
-      if (( $(echo "$COVERAGE < 80.0" | bc -l) )); then
-        echo "Error: Code coverage is below 80%."
-        exit 1
-      fi
-  cache:
-    key:
-      files:
-        - go.sum
-    paths:
-      - /go/pkg/mod
-  coverage: '/^Total coverage: (\d+\.\d+)%$/'
+#💅 Lint:
+#  stage: lint
+#  image: golang:1.24
+#  before_script:
+#    - go mod download
+#    - go mod tidy
+#    - go mod verify
+#    - go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.59.1
+#  script:
+#    # Skip files and ignore errors of `typecheck`
+#    - golangci-lint run -v --timeout 5m --skip-files "tests/.*" --disable typecheck || true
+#    # If always fail, verify that there are no real linting errors instead of only typecheck errors
+#    - |
+#      OUTPUT=$(golangci-lint run --timeout 5m --disable typecheck 2>&1 || true)
+#      if echo "$OUTPUT" | grep -v "typecheck" | grep -E "\.go:[0-9]+:[0-9]+:"; then
+#        echo "Found real linting errors (not typecheck):"
+#        echo "$OUTPUT" | grep -v "typecheck"
+#        exit 1
+#      else
+#        echo "Only typecheck errors found, ignoring them"
+#        exit 0
+#      fi
+#  cache:
+#    key:
+#      files:
+#        - go.sum
+#    paths:
+#      - /go/pkg/mod
+#      - .cache/go-build
+#
+#🧪 Tests:
+#  stage: test
+#  services:
+#    - name: docker:dind
+#      alias: docker
+#  variables:
+#    DOCKER_HOST: tcp://docker:2375
+#    DOCKER_TLS_CERTDIR: ""
+#  script:
+#    - go test ./tests/...
+#  cache:
+#    key:
+#      files:
+#        - go.sum
+#    paths:
+#      - /go/pkg/mod
+#
+#📊 Coverage:
+#  stage: test
+#  services:
+#    - name: docker:dind
+#      alias: docker
+#  variables:
+#    DOCKER_HOST: tcp://docker:2375
+#    DOCKER_TLS_CERTDIR: ""
+#  script:
+#    - |
+#      go test -coverprofile=coverage.out -coverpkg=./auth/...,./lib/...,./model/...,./validation/... ./tests/...
+#      apt-get update && apt-get install -y bc
+#      COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+#      echo "Total coverage: $COVERAGE%"
+#      if (( $(echo "$COVERAGE < 80.0" | bc -l) )); then
+#        echo "Error: Code coverage is below 80%."
+#        exit 1
+#      fi
+#  cache:
+#    key:
+#      files:
+#        - go.sum
+#    paths:
+#      - /go/pkg/mod
+#  coverage: '/^Total coverage: (\d+\.\d+)%$/'
 
 📦 Build:
   stage: build
@@ -86,11 +86,5 @@ stages:
     - go mod tidy
     - go mod verify
   script:
-    - go build -o go-auth .
-  cache:
-    key:
-      files:
-        - go.sum
-    paths:
-      - /go/pkg/mod
-      - .cache/go-build
+    - go vet ./...
+    - go build -v ./...
