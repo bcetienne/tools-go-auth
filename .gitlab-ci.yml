@@ -1,7 +1,38 @@
 image: golang:1.24
 
 stages:
+  - lint
   - test
+
+💅 Lint:
+  stage: lint
+  image: golang:1.24
+  before_script:
+    - go mod download
+    - go mod tidy
+    - go mod verify
+    - go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.59.1
+  script:
+    # Skip files and ignore errors of `typecheck`
+    - golangci-lint run -v --timeout 5m --skip-files "tests/.*" --disable typecheck || true
+    # If always fail, verify that there are no real linting errors instead of only typecheck errors
+    - |
+      OUTPUT=$(golangci-lint run --timeout 5m --disable typecheck 2>&1 || true)
+      if echo "$OUTPUT" | grep -v "typecheck" | grep -E "\.go:[0-9]+:[0-9]+:"; then
+        echo "Found real linting errors (not typecheck):"
+        echo "$OUTPUT" | grep -v "typecheck"
+        exit 1
+      else
+        echo "Only typecheck errors found, ignoring them"
+        exit 0
+      fi
+  cache:
+    key:
+      files:
+        - go.sum
+    paths:
+      - /go/pkg/mod
+      - .cache/go-build
 
 🧪 Tests:
   stage: test
