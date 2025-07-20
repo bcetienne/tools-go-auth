@@ -1,0 +1,9 @@
+image: golang:latest
+
+stages:
+  - test
+
+check_dependencies:
+  stage: test
+  script:
+    - go list -u -m all | { ! grep -q "\[" -; }
