@@ -36,6 +36,73 @@ stages:
       - /go/pkg/mod
       - .cache/go-build
 
+🗄️ SQL Validation:
+  stage: lint
+  before_script:
+    - go mod download
+    - go mod tidy
+    - go mod verify
+    - apt-get update && apt-get install -y postgresql-client
+  script:
+    # Analyze SQL queries embedded in Go code
+    - |
+      echo "=== Analyzing SQL queries embedded in Go code ==="
+      
+      # Search for Go files containing SQL queries
+      SQL_FILES=$(find . -name "*.go" -not -path "./vendor/*" -not -path "./tests/*" -exec grep -l "SELECT\|INSERT\|UPDATE\|DELETE\|CREATE\|DROP\|ALTER" {} \;)
+      
+      if [ -z "$SQL_FILES" ]; then
+        echo "No SQL queries found in Go files"
+        exit 0
+      fi
+      
+      echo "Found SQL queries in the following files:"
+      echo "$SQL_FILES"
+      echo ""
+      
+      # Extract and validate SQL queries
+      for file in $SQL_FILES; do
+        echo "--- Analyzing $file ---"
+      
+        # Simple method to extract SQL queries
+        echo "SQL queries found:"
+        grep -n -A 20 -B 1 "query.*:=.*\`" "$file" | head -50
+      
+        echo ""
+        echo "All SQL statements in this file:"
+        grep -n -E "(SELECT|INSERT|UPDATE|DELETE|CREATE|DROP|ALTER)" "$file"
+      
+        echo ""
+      done
+      
+      # Specific security checks
+      echo "=== Security checks ==="
+      
+      # Search for potential SQL injection issues
+      echo "Checking for potential SQL injection vulnerabilities:"
+      grep -n -r "fmt\.Sprintf.*SELECT\|fmt\.Sprintf.*INSERT\|fmt\.Sprintf.*UPDATE\|fmt\.Sprintf.*DELETE" --include="*.go" . || echo "✓ No fmt.Sprintf with SQL found"
+      
+      # Search for string concatenation with SQL
+      echo "Checking for string concatenation in SQL:"
+      grep -n -r "\+ .*SELECT\|\+ .*INSERT\|\+ .*UPDATE\|\+ .*DELETE" --include="*.go" . || echo "✓ No string concatenation with SQL found"
+      
+      # Check usage of positional parameters
+      echo "Checking SQL parameter usage:"
+      grep -n -r "\$[0-9]" --include="*.go" . | grep -E "SELECT|INSERT|UPDATE|DELETE" || echo "⚠ No parameterized queries found"
+      
+      # Search for queries without parameters (potentially dangerous)
+      echo "Checking for non-parameterized queries:"
+      grep -n -r "db\.Exec\|db\.Query" --include="*.go" . | grep -v "\$" || echo "✓ All queries appear to be parameterized"
+      
+      echo "=== SQL validation completed ==="
+  allow_failure: true
+  cache:
+    key:
+      files:
+        - go.sum
+    paths:
+      - /go/pkg/mod
+
 🧪 Tests:
   stage: test
   services:
