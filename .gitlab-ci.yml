@@ -1,0 +1,21 @@
+image: golang:1.24
+
+stages:
+  - test
+
+🧪 Tests:
+  stage: test
+  services:
+    - name: docker:dind
+      alias: docker
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
+  script:
+    - go test ./tests/...
+  cache:
+    key:
+      files:
+        - go.sum
+    paths:
+      - /go/pkg/mod
