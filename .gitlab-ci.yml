@@ -36,6 +36,16 @@ stages:
       - /go/pkg/mod
       - .cache/go-build
 
+🗄️ SQLVet:
+  stage: lint
+  before_script:
+    - go mod download
+    - go mod tidy
+    - go mod verify
+    - go install github.com/houqp/sqlvet@latest
+  script:
+    - sqlvet ./...
+
 🧪 Tests:
   stage: test
   services:
