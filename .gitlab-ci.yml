@@ -7,13 +7,19 @@ stages:
 💅 Lint:
   stage: lint
   image: golang:1.24
+  variables:
+    GO111MODULE: "on"
+    GOPROXY: "https://proxy.golang.org,direct"
+    GOPATH: "/go"
   before_script:
+    - go version
+    - go env
     - go mod download
     - go mod tidy
+    - go list -m all  # Pour vérifier que les modules sont bien là
     - go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.59.1
-    - go mod verify
   script:
-    - golangci-lint run -v --timeout 5m --modules-download-mode=readonly
+    - golangci-lint run -v --timeout 5m --modules-download-mode=readonly --build-tags=""
   cache:
     key:
       files:
@@ -21,7 +27,6 @@ stages:
     paths:
       - /go/pkg/mod
       - .cache/go-build
-
 🧪 Tests:
   stage: test
   services:
