@@ -92,7 +92,7 @@ stages:
 
 🛡️ Security:
   stage: security
-  image: golang:1.19
+#  image: golang:1.19
   before_script:
     - go mod download
     - go mod tidy
