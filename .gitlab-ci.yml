@@ -12,7 +12,7 @@ test:
     DOCKER_HOST: tcp://docker:2375
     DOCKER_TLS_CERTDIR: ""
   script:
-    - go test ./...
+    - go test ./tests/...
   cache:
     key:
       files:
