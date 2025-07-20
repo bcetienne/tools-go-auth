@@ -7,9 +7,11 @@ stages:
 💅 Lint:
   stage: lint
   image: golangci/golangci-lint:v1.59.1
-  script:
+  before_script:
     - go mod download
-    - golangci-lint run -v
+    - go mod verify
+  script:
+    - golangci-lint run -v --timeout 5m
   cache:
     key:
       files:
