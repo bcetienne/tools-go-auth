@@ -3,7 +3,7 @@ image: golang:1.24
 stages:
   - test
 
-test:
+🧪 Tests:
   stage: test
   services:
     - name: docker:dind
