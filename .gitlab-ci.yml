@@ -3,6 +3,7 @@ image: golang:1.24
 stages:
   - lint
   - test
+  - security
   - build
 
 💅 Lint:
@@ -88,3 +89,13 @@ stages:
   script:
     - go vet ./...
     - go build -v ./...
+
+🛡️ Security:
+  stage: security
+  before_script:
+    - go mod download
+    - go mod tidy
+    - go mod verify
+  script:
+    - go install golang.org/x/vuln/cmd/govulncheck@latest
+    - govulncheck ./...
