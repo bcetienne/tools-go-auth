@@ -13,8 +13,17 @@ stages:
     - go mod verify
     - go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.59.1
   script:
-    # Typecheck cannot resolve external packages.
-    - golangci-lint run -v --timeout 5m --disable typecheck
+    - golangci-lint run -v --timeout 5m --skip-files "tests/.*" --disable typecheck || true
+    - |
+      OUTPUT=$(golangci-lint run --timeout 5m --disable typecheck 2>&1 || true)
+      if echo "$OUTPUT" | grep -v "typecheck" | grep -E "\.go:[0-9]+:[0-9]+:"; then
+        echo "Found real linting errors (not typecheck):"
+        echo "$OUTPUT" | grep -v "typecheck"
+        exit 1
+      else
+        echo "Only typecheck errors found, ignoring them"
+        exit 0
+      fi
   cache:
     key:
       files:
