@@ -1,134 +1,144 @@
+
+# Utiliser l'image Go standard. Les outils seront installés et mis en cache.
 image: golang:1.24
 
 stages:
   - prepare
-  - quality
+  - analyze
+  - test
   - build
 
-variables:
-  # Cache et optimisations globales
-  GOCACHE: "$CI_PROJECT_DIR/.cache/go-build"
-  GOMODCACHE: "$CI_PROJECT_DIR/.cache/go-mod"
-  GOPATH: "$CI_PROJECT_DIR/.cache/go-path"
-  GOPROXY: "https://proxy.golang.org,direct"
-  # CGO_ENABLED doit rester à 1 pour les tests avec -race
-
-# Template de cache réutilisable
-.go-cache:
+# Définitions par défaut pour tous les jobs
+default:
+  # Tous les jobs (sauf le premier) vont récupérer ce cache
   cache:
     key:
       files:
         - go.sum
+        # On inclut le .gitlab-ci.yml pour que le cache des outils soit invalidé si on change leurs versions
+        - .gitlab-ci.yml
     paths:
+      - /go/pkg/mod
+      - /go/bin  # <-- On met en cache les binaires Go installés !
       - .cache/go-build
-      - .cache/go-mod
-      - .cache/go-path
-    policy: pull
+    policy: pull # Politique par défaut : on récupère le cache, on ne le met pas à jour
 
-# Job de préparation des dépendances
-📦 Prepare Dependencies:
+# Ce job s'exécute en premier pour préparer le cache pour tous les autres
+🔧 Setup & Cache:
   stage: prepare
   script:
-    - go mod download
-    - go mod verify
-    # Pré-installer les outils pour les mettre en cache
+    - echo "Installing system dependencies and Go tools..."
+    - apt-get update && apt-get install -y postgresql-client bc
     - go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.59.1
     - go install golang.org/x/vuln/cmd/govulncheck@latest
-    # Vérifier que les outils sont installés
-    - $GOPATH/bin/golangci-lint --version
-    - $GOPATH/bin/govulncheck version
+    - echo "Downloading Go modules..."
+    - go mod download
+    - go mod tidy
+    - go mod verify
+  # Ce job est le seul qui a la permission de mettre à jour (push) le cache
   cache:
+    # On utilise la même clé que dans `default`
     key:
       files:
         - go.sum
+        - .gitlab-ci.yml
     paths:
+      - /go/pkg/mod
+      - /go/bin
       - .cache/go-build
-      - .cache/go-mod
-      - .cache/go-path
-    policy: pull-push
+    policy: pull-push # On s'assure que ce job écrit dans le cache
 
-# Jobs parallèles pour la qualité
+# On ajoute le dossier des binaires Go au PATH pour tous les jobs
+before_script:
+  - export PATH=$PATH:/go/bin
+
+# --- Jobs d'analyse (exécutés en parallèle) ---
+
 💅 Lint:
-  stage: quality
-  extends: .go-cache
-  needs: ["📦 Prepare Dependencies"]
+  stage: analyze
+  needs: ["🔧 Setup & Cache"] # Dépend du cache
   script:
-    # Utiliser les binaires du cache
-    - export PATH="$GOPATH/bin:$PATH"
-    # Linter avec configuration optimisée
     - |
-      $GOPATH/bin/golangci-lint run -v \
-        --timeout 5m \
-        --skip-files "tests/.*" \
-        --disable typecheck \
-        --concurrency 4 \
-        --max-same-issues 0 \
-        --max-issues-per-linter 0 || true
-    # Vérification des vraies erreurs
-    - |
-      OUTPUT=$($GOPATH/bin/golangci-lint run --timeout 5m --disable typecheck 2>&1 || true)
-      if echo "$OUTPUT" | grep -v "typecheck" | grep -E "\.go:[0-9]+:[0-9]+:"; then
+      set -o pipefail
+      golangci-lint run -v --timeout 5m --disable typecheck | tee lint-output.txt
+      if grep -v "typecheck" lint-output.txt | grep -E "\.go:[0-9]+:[0-9]+:" > /dev/null; then
         echo "Found real linting errors (not typecheck):"
-        echo "$OUTPUT" | grep -v "typecheck"
+        grep -v "typecheck" lint-output.txt
         exit 1
+      else
+        echo "Linting successful (only typecheck errors found, which are ignored)."
+        exit 0
       fi
 
 🗄️ SQL Validation:
-  stage: quality
-  extends: .go-cache
-  needs: ["📦 Prepare Dependencies"]
-  before_script:
-    # Installation rapide de postgresql-client
-    - apt-get update -qq && apt-get install -y -qq postgresql-client > /dev/null
+  stage: analyze
+  needs: ["🔧 Setup & Cache"]
   script:
+    # Le script reste le même, mais postgresql-client est déjà dans le runner grâce au cache
     - |
-      echo "=== Analyzing SQL queries ==="
+      echo "=== Analyzing SQL queries embedded in Go code ==="
       
-      # Recherche optimisée des fichiers SQL
-      SQL_FILES=$(find . -name "*.go" -not -path "./vendor/*" -not -path "./tests/*" -type f -print0 | \
-                  xargs -0 grep -l "SELECT\|INSERT\|UPDATE\|DELETE\|CREATE\|DROP\|ALTER" 2>/dev/null || true)
+      # Search for Go files containing SQL queries
+      SQL_FILES=$(find . -name "*.go" -not -path "./vendor/*" -not -path "./tests/*" -exec grep -l "SELECT\|INSERT\|UPDATE\|DELETE\|CREATE\|DROP\|ALTER" {} \;)
       
       if [ -z "$SQL_FILES" ]; then
-        echo "No SQL queries found"
+        echo "No SQL queries found in Go files"
         exit 0
       fi
       
-      # Analyse parallèle des fichiers
-      echo "$SQL_FILES" | xargs -P 4 -I {} sh -c '
-        echo "--- Analyzing {} ---"
-        grep -n -E "(SELECT|INSERT|UPDATE|DELETE|CREATE|DROP|ALTER)" "{}" | head -20
-      '
+      echo "Found SQL queries in the following files:"
+      echo "$SQL_FILES"
+      echo ""
       
-      # Vérifications de sécurité en une seule passe
+      # Extract and validate SQL queries
+      for file in $SQL_FILES; do
+        echo "--- Analyzing $file ---"
+      
+        # Simple method to extract SQL queries
+        echo "SQL queries found:"
+        grep -n -A 20 -B 1 "query.*:=.*\`" "$file" | head -50
+      
+        echo ""
+        echo "All SQL statements in this file:"
+        grep -n -E "(SELECT|INSERT|UPDATE|DELETE|CREATE|DROP|ALTER)" "$file"
+      
+        echo ""
+      done
+      
+      # Specific security checks
       echo "=== Security checks ==="
-      find . -name "*.go" -not -path "./vendor/*" -type f -print0 | \
-        xargs -0 grep -n -E "(fmt\.Sprintf.*(SELECT|INSERT|UPDATE|DELETE)|\+ .*(SELECT|INSERT|UPDATE|DELETE))" || \
-        echo "✓ No SQL injection vulnerabilities found"
       
-      # Vérification des requêtes paramétrées
-      find . -name "*.go" -not -path "./vendor/*" -type f -print0 | \
-        xargs -0 grep -E "(db\.Exec|db\.Query)" | grep -v "\$" || \
-        echo "✓ All queries appear to be parameterized"
+      # Search for potential SQL injection issues
+      echo "Checking for potential SQL injection vulnerabilities:"
+      grep -n -r "fmt\.Sprintf.*SELECT\|fmt\.Sprintf.*INSERT\|fmt\.Sprintf.*UPDATE\|fmt\.Sprintf.*DELETE" --include="*.go" . || echo "✓ No fmt.Sprintf with SQL found"
+      
+      # Search for string concatenation with SQL
+      echo "Checking for string concatenation in SQL:"
+      grep -n -r "\+ .*SELECT\|\+ .*INSERT\|\+ .*UPDATE\|\+ .*DELETE" --include="*.go" . || echo "✓ No string concatenation with SQL found"
+      
+      # Check usage of positional parameters
+      echo "Checking SQL parameter usage:"
+      grep -n -r "\$[0-9]" --include="*.go" . | grep -E "SELECT|INSERT|UPDATE|DELETE" || echo "⚠ No parameterized queries found"
+      
+      # Search for queries without parameters (potentially dangerous)
+      echo "Checking for non-parameterized queries:"
+      grep -n -r "db\.Exec\|db\.Query" --include="*.go" . | grep -v "\$" || echo "✓ All queries appear to be parameterized"
+      
+      echo "=== SQL validation completed ==="
+
   allow_failure: true
 
-🧪 Tests:
-  stage: quality
-  extends: .go-cache
-  needs: ["📦 Prepare Dependencies"]
-  services:
-    - name: docker:dind
-      alias: docker
-  variables:
-    DOCKER_HOST: tcp://docker:2375
-    DOCKER_TLS_CERTDIR: ""
+🛡️ Security Scan:
+  stage: analyze
+  needs: ["🔧 Setup & Cache"]
   script:
-    # Tests avec parallélisation (sans -race car CGO peut être désactivé en CI)
-    - go test -p 4 -short -timeout 10m ./tests/...
+    - govulncheck ./...
 
-📊 Coverage:
-  stage: quality
-  extends: .go-cache
-  needs: ["📦 Prepare Dependencies"]
+# --- Étape de Test ---
+
+🧪 Test & Coverage:
+  stage: test
+  needs: ["🔧 Setup & Cache"]
   services:
     - name: docker:dind
       alias: docker
@@ -136,41 +146,25 @@ variables:
     DOCKER_HOST: tcp://docker:2375
     DOCKER_TLS_CERTDIR: ""
   script:
-    # Coverage avec tests parallèles (sans -race pour éviter CGO)
-    - go test -p 4 -coverprofile=coverage.out -covermode=atomic -coverpkg=./auth/...,./lib/...,./model/...,./validation/... ./tests/...
-    # Utilisation d'awk pour éviter l'installation de bc
     - |
+      go test -coverprofile=coverage.out -coverpkg=./auth/...,./lib/...,./model/...,./validation/... ./tests/...
+      apt-get update && apt-get install -y bc
       COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
       echo "Total coverage: $COVERAGE%"
-      awk -v cov="$COVERAGE" 'BEGIN { if (cov < 80.0) exit 1 }'
+      if (( $(echo "$COVERAGE < 80.0" | bc -l) )); then
+        echo "Error: Code coverage is below 80%."
+        exit 1
+      fi
   coverage: '/^Total coverage: (\d+\.\d+)%$/'
-  artifacts:
-    reports:
-      coverage_report:
-        coverage_format: cobertura
-        path: coverage.out
 
-🛡️ Security:
-  stage: quality
-  extends: .go-cache
-  needs: ["📦 Prepare Dependencies"]
-  script:
-    - export PATH="$GOPATH/bin:$PATH"
-    # Scan de vulnérabilités avec cache
-    - $GOPATH/bin/govulncheck -scan package ./...
+# --- Étape de Build ---
 
 📦 Build:
   stage: build
-  extends: .go-cache
-  needs:
-    - "💅 Lint"
-    - "🧪 Tests"
-    - "📊 Coverage"
-    - "🛡️ Security"
+  needs: ["🔧 Setup & Cache"]
   script:
-    # Build optimisé avec parallélisation et CGO désactivé pour des binaires statiques
-    - CGO_ENABLED=0 go build -p 4 -v -ldflags="-s -w" -o ./bin/ ./...
+    - go vet ./...
+    - go build -v -o my-application ./...
   artifacts:
     paths:
-      - bin/
-    expire_in: 1 week
+      - my-application
