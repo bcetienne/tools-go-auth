@@ -99,21 +99,21 @@ func getQuery(query queryType) string {
 	return ""
 }
 
-func newToken(config *lib.Config, userID int) (*model.RefreshToken, error) {
+func newToken(config *lib.Config, userID int) (*model.RefreshToken, *string, *time.Time, error) {
 	// Parse duration from configuration
 	duration, err := time.ParseDuration(config.RefreshTokenExpiry)
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
 	expiresAt := time.Now().Add(duration)
 
 	// Create a random token
 	token, err := lib.GenerateRandomString(255)
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
 
-	return model.NewRefreshToken(userID, token, expiresAt), nil
+	return model.NewRefreshToken(userID, token, expiresAt), &token, &expiresAt, nil
 }
 
 // NewRefreshTokenService initializes the refresh token management service.
@@ -229,7 +229,7 @@ func (rts *RefreshTokenService) CreateRefreshToken(userID int) (*model.RefreshTo
 		return nil, errors.New("invalid user ID")
 	}
 
-	refreshToken, err := newToken(rts.config, userID)
+	refreshToken, token, expiresAt, err := newToken(rts.config, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -259,7 +259,7 @@ func (rts *RefreshTokenService) CreateRefreshTokenWithContext(ctx context.Contex
 		return nil, errors.New("invalid user ID")
 	}
 
-	refreshToken, err := newToken(rts.config, userID)
+	refreshToken, token, expiresAt, err := newToken(rts.config, userID)
 	if err != nil {
 		return nil, err
 	}
