@@ -143,26 +143,26 @@ func NewRefreshTokenService(db *sql.DB, config *lib.Config) (*RefreshTokenServic
 	defer tx.Rollback()
 
 	// Check if schema exists
-	err = tx.QueryRow(getQuery("schemaExists")).Scan(&exists)
+	err = tx.QueryRow(getQuery(schemaExists)).Scan(&exists)
 	if err != nil {
 		return nil, err
 	}
 	if !exists {
 		// Create the schema if it does not exist
-		_, err = tx.Exec(getQuery("schemaCreation"))
+		_, err = tx.Exec(getQuery(schemaCreation))
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	// Check if table exists
-	err = tx.QueryRow(getQuery("tableExists")).Scan(&exists)
+	err = tx.QueryRow(getQuery(tableExists)).Scan(&exists)
 	if err != nil {
 		return nil, err
 	}
 	if !exists {
 		// Create the table if it does not exist
-		_, err = tx.Exec(getQuery("tableCreation"))
+		_, err = tx.Exec(getQuery(tableCreation))
 		if err != nil {
 			return nil, err
 		}
@@ -191,26 +191,26 @@ func NewRefreshTokenServiceWithContext(ctx context.Context, db *sql.DB, config *
 	defer tx.Rollback()
 
 	// Check if schema exists
-	err = tx.QueryRowContext(ctx, getQuery("schemaExists")).Scan(&exists)
+	err = tx.QueryRowContext(ctx, getQuery(schemaExists)).Scan(&exists)
 	if err != nil {
 		return nil, err
 	}
 	if !exists {
 		// Create the schema if it does not exist
-		_, err = tx.ExecContext(ctx, getQuery("schemaCreation"))
+		_, err = tx.ExecContext(ctx, getQuery(schemaCreation))
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	// Check if table exists
-	err = tx.QueryRowContext(ctx, getQuery("tableExists")).Scan(&exists)
+	err = tx.QueryRowContext(ctx, getQuery(tableExists)).Scan(&exists)
 	if err != nil {
 		return nil, err
 	}
 	if !exists {
 		// Create the table if it does not exist
-		_, err = tx.ExecContext(ctx, getQuery("tableCreation"))
+		_, err = tx.ExecContext(ctx, getQuery(tableCreation))
 		if err != nil {
 			return nil, err
 		}
@@ -241,7 +241,7 @@ func (rts *RefreshTokenService) CreateRefreshToken(userID int) (*model.RefreshTo
 	}
 	defer tx.Rollback()
 
-	row := tx.QueryRow(getQuery("createRefreshToken"), userID, token, expiresAt)
+	row := tx.QueryRow(getQuery(createRefreshToken), userID, token, expiresAt)
 	err = row.Scan(&refreshToken.RefreshTokenID)
 	if err != nil {
 		return nil, err
@@ -271,7 +271,7 @@ func (rts *RefreshTokenService) CreateRefreshTokenWithContext(ctx context.Contex
 	}
 	defer tx.Rollback()
 
-	row := tx.QueryRowContext(ctx, getQuery("createRefreshToken"), userID, token, expiresAt)
+	row := tx.QueryRowContext(ctx, getQuery(createRefreshToken), userID, token, expiresAt)
 	err = row.Scan(&refreshToken.RefreshTokenID)
 	if err != nil {
 		return nil, err
@@ -292,7 +292,7 @@ func (rts *RefreshTokenService) VerifyRefreshToken(token string) (*bool, error) 
 		return nil, err
 	}
 	defer tx.Rollback()
-	row := tx.QueryRow(getQuery("verifyToken"), token)
+	row := tx.QueryRow(getQuery(verifyToken), token)
 	err = row.Scan(&exists)
 	if err != nil {
 		return nil, err
@@ -311,7 +311,7 @@ func (rts *RefreshTokenService) VerifyRefreshTokenWithContext(ctx context.Contex
 		return nil, err
 	}
 	defer tx.Rollback()
-	row := tx.QueryRowContext(ctx, getQuery("verifyToken"), token)
+	row := tx.QueryRowContext(ctx, getQuery(verifyToken), token)
 	err = row.Scan(&exists)
 	if err != nil {
 		return nil, err
@@ -330,7 +330,7 @@ func (rts *RefreshTokenService) RevokeRefreshToken(token string, userID int) err
 		return err
 	}
 	defer tx.Rollback()
-	_, err = tx.Exec(getQuery("revokeToken"), userID, token)
+	_, err = tx.Exec(getQuery(revokeToken), userID, token)
 	if err != nil {
 		return err
 	}
@@ -347,7 +347,7 @@ func (rts *RefreshTokenService) RevokeRefreshTokenWithContext(ctx context.Contex
 		return err
 	}
 	defer tx.Rollback()
-	_, err = tx.ExecContext(ctx, getQuery("revokeToken"), userID, token)
+	_, err = tx.ExecContext(ctx, getQuery(revokeToken), userID, token)
 	if err != nil {
 		return err
 	}
@@ -365,7 +365,7 @@ func (rts *RefreshTokenService) RevokeAllUserRefreshTokens(userID int) error {
 		return err
 	}
 	defer tx.Rollback()
-	_, err = tx.Exec(getQuery("revokeAllTokens"), userID)
+	_, err = tx.Exec(getQuery(revokeAllTokens), userID)
 	if err != nil {
 		return err
 	}
@@ -382,7 +382,7 @@ func (rts *RefreshTokenService) RevokeAllUserRefreshTokensWithContext(ctx contex
 		return err
 	}
 	defer tx.Rollback()
-	_, err = tx.ExecContext(ctx, getQuery("revokeAllTokens"), userID)
+	_, err = tx.ExecContext(ctx, getQuery(revokeAllTokens), userID)
 	if err != nil {
 		return err
 	}
@@ -399,7 +399,7 @@ func (rts *RefreshTokenService) DeleteExpiredRefreshTokens() error {
 		return err
 	}
 	defer tx.Rollback()
-	_, err = tx.Exec(getQuery("revokeExpiredTokens"))
+	_, err = tx.Exec(getQuery(revokeExpiredTokens))
 	if err != nil {
 		return err
 	}
@@ -416,7 +416,7 @@ func (rts *RefreshTokenService) DeleteExpiredRefreshTokensWithContext(ctx contex
 		return err
 	}
 	defer tx.Rollback()
-	_, err = tx.ExecContext(ctx, getQuery("revokeExpiredTokens"))
+	_, err = tx.ExecContext(ctx, getQuery(revokeExpiredTokens))
 	if err != nil {
 		return err
 	}
@@ -434,7 +434,7 @@ func (rts *RefreshTokenService) FlushRefreshTokens() error {
 		return err
 	}
 	defer tx.Rollback()
-	_, err = tx.Exec(getQuery("flush"))
+	_, err = tx.Exec(getQuery(flush))
 	if err != nil {
 		return err
 	}
@@ -451,7 +451,7 @@ func (rts *RefreshTokenService) FlushRefreshTokensWithContext(ctx context.Contex
 		return err
 	}
 	defer tx.Rollback()
-	_, err = tx.ExecContext(ctx, getQuery("flush"))
+	_, err = tx.ExecContext(ctx, getQuery(flush))
 	if err != nil {
 		return err
 	}
@@ -469,7 +469,7 @@ func (rts *RefreshTokenService) FlushUserRefreshTokens(userID int) error {
 		return err
 	}
 	defer tx.Rollback()
-	_, err = tx.Exec(getQuery("flushUserTokens"), userID)
+	_, err = tx.Exec(getQuery(flushUserTokens), userID)
 	if err != nil {
 		return err
 	}
@@ -486,7 +486,7 @@ func (rts *RefreshTokenService) FlushUserRefreshTokensWithContext(ctx context.Co
 		return err
 	}
 	defer tx.Rollback()
-	_, err = tx.ExecContext(ctx, getQuery("flushUserTokens"), userID)
+	_, err = tx.ExecContext(ctx, getQuery(flushUserTokens), userID)
 	if err != nil {
 		return err
 	}
