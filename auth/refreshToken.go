@@ -28,6 +28,8 @@ type RefreshTokenServiceInterface interface {
 	DeleteExpiredRefreshTokensWithContext(ctx context.Context) error
 	FlushRefreshTokens() error
 	FlushRefreshTokensWithContext(ctx context.Context) error
+	FlushUserRefreshTokens(userID int) error
+	FlushUserRefreshTokensWithContext(ctx context.Context, userID int) error
 }
 
 type queryType string
@@ -114,6 +116,16 @@ func newToken(config *lib.Config, userID int) (*model.RefreshToken, *string, *ti
 	}
 
 	return model.NewRefreshToken(userID, token, expiresAt), &token, &expiresAt, nil
+}
+
+func isIncommingTokenValid(token string) error {
+	if len(token) == 0 {
+		return errors.New("empty token")
+	}
+	if len(token) > 255 {
+		return errors.New("token too long")
+	}
+	return nil
 }
 
 // NewRefreshTokenService initializes the refresh token management service.
@@ -285,38 +297,25 @@ func (rts *RefreshTokenService) CreateRefreshTokenWithContext(ctx context.Contex
 
 // VerifyRefreshToken checks if a given refresh token is valid and not revoked.
 func (rts *RefreshTokenService) VerifyRefreshToken(token string) (*bool, error) {
+	if err := isIncommingTokenValid(token); err != nil {
+		return nil, err
+	}
+
 	var exists bool
-	// Prepare transaction
-	tx, err := rts.db.Begin()
-	if err != nil {
-		return nil, err
-	}
-	defer tx.Rollback()
-	row := tx.QueryRow(getQuery(verifyToken), token)
-	err = row.Scan(&exists)
-	if err != nil {
-		return nil, err
-	}
-	if err = tx.Commit(); err != nil {
+	row := rts.db.QueryRow(getQuery(verifyToken), token)
+	if err := row.Scan(&exists); err != nil {
 		return nil, err
 	}
 	return &exists, nil
 }
 
 func (rts *RefreshTokenService) VerifyRefreshTokenWithContext(ctx context.Context, token string) (*bool, error) {
+	if err := isIncommingTokenValid(token); err != nil {
+		return nil, err
+	}
 	var exists bool
-	// Prepare transaction
-	tx, err := rts.db.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer tx.Rollback()
-	row := tx.QueryRowContext(ctx, getQuery(verifyToken), token)
-	err = row.Scan(&exists)
-	if err != nil {
-		return nil, err
-	}
-	if err = tx.Commit(); err != nil {
+	row := rts.db.QueryRowContext(ctx, getQuery(verifyToken), token)
+	if err := row.Scan(&exists); err != nil {
 		return nil, err
 	}
 	return &exists, nil
@@ -324,6 +323,9 @@ func (rts *RefreshTokenService) VerifyRefreshTokenWithContext(ctx context.Contex
 
 // RevokeRefreshToken revokes a refresh token for a user
 func (rts *RefreshTokenService) RevokeRefreshToken(token string, userID int) error {
+	if err := isIncommingTokenValid(token); err != nil {
+		return err
+	}
 	// Prepare transaction
 	tx, err := rts.db.Begin()
 	if err != nil {
@@ -341,6 +343,9 @@ func (rts *RefreshTokenService) RevokeRefreshToken(token string, userID int) err
 }
 
 func (rts *RefreshTokenService) RevokeRefreshTokenWithContext(ctx context.Context, token string, userID int) error {
+	if err := isIncommingTokenValid(token); err != nil {
+		return err
+	}
 	// Prepare transaction
 	tx, err := rts.db.BeginTx(ctx, nil)
 	if err != nil {
