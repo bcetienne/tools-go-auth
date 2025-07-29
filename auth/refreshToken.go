@@ -35,6 +35,7 @@ type RefreshTokenServiceInterface interface {
 type queryType string
 
 const (
+	tokenMaxLength      int       = 255
 	schemaExists        queryType = "schemaExists"
 	tableExists         queryType = "tableExists"
 	schemaCreation      queryType = "schemaCreation"
@@ -79,6 +80,7 @@ func getQuery(query queryType) string {
 			UNIQUE(token)
 		);
 		COMMENT ON TABLE go_auth.refresh_token IS 'Refresh tokens for user authentication';
+		CREATE INDEX idx_refresh_token_user_id ON go_auth.refresh_token(user_id);
 		CREATE INDEX idx_refresh_token_token ON go_auth.refresh_token(token);
 		CREATE INDEX idx_refresh_token_expires_at ON go_auth.refresh_token(expires_at);
 		`
@@ -110,7 +112,7 @@ func newToken(config *lib.Config, userID int) (*model.RefreshToken, *string, *ti
 	expiresAt := time.Now().Add(duration)
 
 	// Create a random token
-	token, err := lib.GenerateRandomString(255)
+	token, err := lib.GenerateRandomString(tokenMaxLength)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -118,11 +120,11 @@ func newToken(config *lib.Config, userID int) (*model.RefreshToken, *string, *ti
 	return model.NewRefreshToken(userID, token, expiresAt), &token, &expiresAt, nil
 }
 
-func isIncommingTokenValid(token string) error {
+func isIncomingTokenValid(token string) error {
 	if len(token) == 0 {
 		return errors.New("empty token")
 	}
-	if len(token) > 255 {
+	if len(token) > tokenMaxLength {
 		return errors.New("token too long")
 	}
 	return nil
@@ -297,7 +299,7 @@ func (rts *RefreshTokenService) CreateRefreshTokenWithContext(ctx context.Contex
 
 // VerifyRefreshToken checks if a given refresh token is valid and not revoked.
 func (rts *RefreshTokenService) VerifyRefreshToken(token string) (*bool, error) {
-	if err := isIncommingTokenValid(token); err != nil {
+	if err := isIncomingTokenValid(token); err != nil {
 		return nil, err
 	}
 
@@ -310,7 +312,7 @@ func (rts *RefreshTokenService) VerifyRefreshToken(token string) (*bool, error) 
 }
 
 func (rts *RefreshTokenService) VerifyRefreshTokenWithContext(ctx context.Context, token string) (*bool, error) {
-	if err := isIncommingTokenValid(token); err != nil {
+	if err := isIncomingTokenValid(token); err != nil {
 		return nil, err
 	}
 	var exists bool
@@ -323,7 +325,7 @@ func (rts *RefreshTokenService) VerifyRefreshTokenWithContext(ctx context.Contex
 
 // RevokeRefreshToken revokes a refresh token for a user
 func (rts *RefreshTokenService) RevokeRefreshToken(token string, userID int) error {
-	if err := isIncommingTokenValid(token); err != nil {
+	if err := isIncomingTokenValid(token); err != nil {
 		return err
 	}
 	// Prepare transaction
@@ -343,7 +345,7 @@ func (rts *RefreshTokenService) RevokeRefreshToken(token string, userID int) err
 }
 
 func (rts *RefreshTokenService) RevokeRefreshTokenWithContext(ctx context.Context, token string, userID int) error {
-	if err := isIncommingTokenValid(token); err != nil {
+	if err := isIncomingTokenValid(token); err != nil {
 		return err
 	}
 	// Prepare transaction
