@@ -16,20 +16,13 @@ type RefreshTokenService struct {
 }
 
 type RefreshTokenServiceInterface interface {
-	CreateRefreshToken(userID int) (*model.RefreshToken, error)
-	CreateRefreshTokenWithContext(ctx context.Context, userID int) (*model.RefreshToken, error)
-	VerifyRefreshToken(token string) (*bool, error)
-	VerifyRefreshTokenWithContext(ctx context.Context, token string) (*bool, error)
-	RevokeRefreshToken(token string, userID int) error
-	RevokeRefreshTokenWithContext(ctx context.Context, token string, userID int) error
-	RevokeAllUserRefreshTokens(userID int) error
-	RevokeAllUserRefreshTokensWithContext(ctx context.Context, userID int) error
-	DeleteExpiredRefreshTokens() error
-	DeleteExpiredRefreshTokensWithContext(ctx context.Context) error
-	FlushRefreshTokens() error
-	FlushRefreshTokensWithContext(ctx context.Context) error
-	FlushUserRefreshTokens(userID int) error
-	FlushUserRefreshTokensWithContext(ctx context.Context, userID int) error
+	CreateRefreshToken(ctx context.Context, userID int) (*model.RefreshToken, error)
+	VerifyRefreshToken(ctx context.Context, token string) (*bool, error)
+	RevokeRefreshToken(ctx context.Context, token string, userID int) error
+	RevokeAllUserRefreshTokens(ctx context.Context, userID int) error
+	DeleteExpiredRefreshTokens(ctx context.Context) error
+	FlushRefreshTokens(ctx context.Context) error
+	FlushUserRefreshTokens(ctx context.Context, userID int) error
 }
 
 type queryType string
@@ -103,23 +96,6 @@ func getQuery(query queryType) string {
 	return ""
 }
 
-func newToken(config *lib.Config, userID int) (*model.RefreshToken, *string, *time.Time, error) {
-	// Parse duration from configuration
-	duration, err := time.ParseDuration(config.RefreshTokenExpiry)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	expiresAt := time.Now().Add(duration)
-
-	// Create a random token
-	token, err := lib.GenerateRandomString(tokenMaxLength)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	return model.NewRefreshToken(userID, token, expiresAt), &token, &expiresAt, nil
-}
-
 func isIncomingTokenValid(token string) error {
 	if len(token) == 0 {
 		return errors.New("empty token")
@@ -130,10 +106,27 @@ func isIncomingTokenValid(token string) error {
 	return nil
 }
 
+func (rts *RefreshTokenService) newRefreshToken(userID int) (*model.RefreshToken, error) {
+	// Parse duration from configuration
+	duration, err := time.ParseDuration(rts.config.RefreshTokenExpiry)
+	if err != nil {
+		return nil, err
+	}
+	expiresAt := time.Now().Add(duration)
+
+	// Create a random token
+	token, err := lib.GenerateRandomString(tokenMaxLength)
+	if err != nil {
+		return nil, err
+	}
+
+	return model.NewRefreshToken(userID, token, expiresAt), nil
+}
+
 // NewRefreshTokenService initializes the refresh token management service.
 // This function checks for the existence of the required schema and table in the PostgreSQL database.
 // If the schema or table does not exist, they are created automatically.
-//
+//e
 // Parameters:
 //   - db: pointer to the SQL database connection
 //   - config: application configuration
@@ -141,7 +134,11 @@ func isIncomingTokenValid(token string) error {
 // Returns:
 //   - *RefreshTokenService: instance of the initialized service
 //   - error: any error encountered during initialization
-func NewRefreshTokenService(db *sql.DB, config *lib.Config) (*RefreshTokenService, error) {
+func NewRefreshTokenService(ctx context.Context, db *sql.DB, config *lib.Config) (*RefreshTokenService, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	service := &RefreshTokenService{
 		db:     db,
 		config: config,
@@ -150,7 +147,7 @@ func NewRefreshTokenService(db *sql.DB, config *lib.Config) (*RefreshTokenServic
 	var exists bool
 
 	// Prepare transaction
-	tx, err := db.Begin()
+	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -189,91 +186,17 @@ func NewRefreshTokenService(db *sql.DB, config *lib.Config) (*RefreshTokenServic
 	return service, nil
 }
 
-func NewRefreshTokenServiceWithContext(ctx context.Context, db *sql.DB, config *lib.Config) (*RefreshTokenService, error) {
-	service := &RefreshTokenService{
-		db:     db,
-		config: config,
-	}
-
-	var exists bool
-
-	// Prepare transaction
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer tx.Rollback()
-
-	// Check if schema exists
-	err = tx.QueryRowContext(ctx, getQuery(schemaExists)).Scan(&exists)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		// Create the schema if it does not exist
-		_, err = tx.ExecContext(ctx, getQuery(schemaCreation))
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// Check if table exists
-	err = tx.QueryRowContext(ctx, getQuery(tableExists)).Scan(&exists)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		// Create the table if it does not exist
-		_, err = tx.ExecContext(ctx, getQuery(tableCreation))
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if err = tx.Commit(); err != nil {
-		return nil, err
-	}
-
-	return service, nil
-}
-
 // CreateRefreshToken creates a new refresh token for a user
-func (rts *RefreshTokenService) CreateRefreshToken(userID int) (*model.RefreshToken, error) {
+func (rts *RefreshTokenService) CreateRefreshToken(ctx context.Context, userID int) (*model.RefreshToken, error) {
 	if userID <= 0 {
 		return nil, errors.New("invalid user ID")
 	}
 
-	refreshToken, token, expiresAt, err := newToken(rts.config, userID)
-	if err != nil {
-		return nil, err
+	if ctx == nil {
+		ctx = context.Background()
 	}
 
-	// Prepare transaction
-	tx, err := rts.db.Begin()
-	if err != nil {
-		return nil, err
-	}
-	defer tx.Rollback()
-
-	row := tx.QueryRow(getQuery(createRefreshToken), userID, token, expiresAt)
-	err = row.Scan(&refreshToken.RefreshTokenID)
-	if err != nil {
-		return nil, err
-	}
-
-	if err = tx.Commit(); err != nil {
-		return nil, err
-	}
-
-	return refreshToken, nil
-}
-
-func (rts *RefreshTokenService) CreateRefreshTokenWithContext(ctx context.Context, userID int) (*model.RefreshToken, error) {
-	if userID <= 0 {
-		return nil, errors.New("invalid user ID")
-	}
-
-	refreshToken, token, expiresAt, err := newToken(rts.config, userID)
+	refreshToken, err := rts.newRefreshToken(userID)
 	if err != nil {
 		return nil, err
 	}
@@ -285,7 +208,7 @@ func (rts *RefreshTokenService) CreateRefreshTokenWithContext(ctx context.Contex
 	}
 	defer tx.Rollback()
 
-	row := tx.QueryRowContext(ctx, getQuery(createRefreshToken), userID, token, expiresAt)
+	row := tx.QueryRowContext(ctx, getQuery(createRefreshToken), refreshToken.UserID, refreshToken.Token, refreshToken.ExpiresAt)
 	err = row.Scan(&refreshToken.RefreshTokenID)
 	if err != nil {
 		return nil, err
@@ -294,27 +217,20 @@ func (rts *RefreshTokenService) CreateRefreshTokenWithContext(ctx context.Contex
 	if err = tx.Commit(); err != nil {
 		return nil, err
 	}
+
 	return refreshToken, nil
 }
 
 // VerifyRefreshToken checks if a given refresh token is valid and not revoked.
-func (rts *RefreshTokenService) VerifyRefreshToken(token string) (*bool, error) {
+func (rts *RefreshTokenService) VerifyRefreshToken(ctx context.Context, token string) (*bool, error) {
 	if err := isIncomingTokenValid(token); err != nil {
 		return nil, err
 	}
 
-	var exists bool
-	row := rts.db.QueryRow(getQuery(verifyToken), token)
-	if err := row.Scan(&exists); err != nil {
-		return nil, err
+	if ctx == nil {
+		ctx = context.Background()
 	}
-	return &exists, nil
-}
 
-func (rts *RefreshTokenService) VerifyRefreshTokenWithContext(ctx context.Context, token string) (*bool, error) {
-	if err := isIncomingTokenValid(token); err != nil {
-		return nil, err
-	}
 	var exists bool
 	row := rts.db.QueryRowContext(ctx, getQuery(verifyToken), token)
 	if err := row.Scan(&exists); err != nil {
@@ -324,181 +240,130 @@ func (rts *RefreshTokenService) VerifyRefreshTokenWithContext(ctx context.Contex
 }
 
 // RevokeRefreshToken revokes a refresh token for a user
-func (rts *RefreshTokenService) RevokeRefreshToken(token string, userID int) error {
+func (rts *RefreshTokenService) RevokeRefreshToken(ctx context.Context, token string, userID int) error {
 	if err := isIncomingTokenValid(token); err != nil {
 		return err
 	}
-	// Prepare transaction
-	tx, err := rts.db.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	_, err = tx.Exec(getQuery(revokeToken), userID, token)
-	if err != nil {
-		return err
-	}
-	if err = tx.Commit(); err != nil {
-		return err
-	}
-	return nil
-}
 
-func (rts *RefreshTokenService) RevokeRefreshTokenWithContext(ctx context.Context, token string, userID int) error {
-	if err := isIncomingTokenValid(token); err != nil {
-		return err
+	if ctx == nil {
+		ctx = context.Background()
 	}
+
 	// Prepare transaction
 	tx, err := rts.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	_, err = tx.ExecContext(ctx, getQuery(revokeToken), userID, token)
+	result, err := tx.ExecContext(ctx, getQuery(revokeToken), userID, token)
 	if err != nil {
 		return err
 	}
-	if err = tx.Commit(); err != nil {
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
 		return err
 	}
-	return nil
+	if rowsAffected == 0 {
+		return errors.New("token not found or already revoked")
+	}
+
+	return tx.Commit()
 }
 
 // RevokeAllUserRefreshTokens revokes all refresh tokens not already revoked, for a user
-func (rts *RefreshTokenService) RevokeAllUserRefreshTokens(userID int) error {
-	// Prepare transaction
-	tx, err := rts.db.Begin()
-	if err != nil {
-		return err
+func (rts *RefreshTokenService) RevokeAllUserRefreshTokens(ctx context.Context, userID int) error {
+	if ctx == nil {
+		ctx = context.Background()
 	}
-	defer tx.Rollback()
-	_, err = tx.Exec(getQuery(revokeAllTokens), userID)
-	if err != nil {
-		return err
-	}
-	if err = tx.Commit(); err != nil {
-		return err
-	}
-	return nil
-}
 
-func (rts *RefreshTokenService) RevokeAllUserRefreshTokensWithContext(ctx context.Context, userID int) error {
 	// Prepare transaction
 	tx, err := rts.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	_, err = tx.ExecContext(ctx, getQuery(revokeAllTokens), userID)
+	result, err := tx.ExecContext(ctx, getQuery(revokeAllTokens), userID)
 	if err != nil {
 		return err
 	}
-	if err = tx.Commit(); err != nil {
+
+	_, err = result.RowsAffected()
+	if err != nil {
 		return err
 	}
-	return nil
+
+	return tx.Commit()
 }
 
-func (rts *RefreshTokenService) DeleteExpiredRefreshTokens() error {
-	// Prepare transaction
-	tx, err := rts.db.Begin()
-	if err != nil {
-		return err
+func (rts *RefreshTokenService) DeleteExpiredRefreshTokens(ctx context.Context) error {
+	if ctx == nil {
+		ctx = context.Background()
 	}
-	defer tx.Rollback()
-	_, err = tx.Exec(getQuery(revokeExpiredTokens))
-	if err != nil {
-		return err
-	}
-	if err = tx.Commit(); err != nil {
-		return err
-	}
-	return nil
-}
 
-func (rts *RefreshTokenService) DeleteExpiredRefreshTokensWithContext(ctx context.Context) error {
 	// Prepare transaction
 	tx, err := rts.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	_, err = tx.ExecContext(ctx, getQuery(revokeExpiredTokens))
+	result, err := tx.ExecContext(ctx, getQuery(revokeExpiredTokens))
 	if err != nil {
 		return err
 	}
-	if err = tx.Commit(); err != nil {
+
+	_, err = result.RowsAffected()
+	if err != nil {
 		return err
 	}
-	return nil
+
+	return tx.Commit()
 }
 
 // FlushRefreshTokens deletes all refresh tokens
-func (rts *RefreshTokenService) FlushRefreshTokens() error {
-	// Prepare transaction
-	tx, err := rts.db.Begin()
-	if err != nil {
-		return err
+func (rts *RefreshTokenService) FlushRefreshTokens(ctx context.Context) error {
+	if ctx == nil {
+		ctx = context.Background()
 	}
-	defer tx.Rollback()
-	_, err = tx.Exec(getQuery(flush))
-	if err != nil {
-		return err
-	}
-	if err = tx.Commit(); err != nil {
-		return err
-	}
-	return nil
-}
 
-func (rts *RefreshTokenService) FlushRefreshTokensWithContext(ctx context.Context) error {
 	// Prepare transaction
 	tx, err := rts.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	_, err = tx.ExecContext(ctx, getQuery(flush))
+	result, err := tx.ExecContext(ctx, getQuery(flush))
 	if err != nil {
 		return err
 	}
-	if err = tx.Commit(); err != nil {
+
+	_, err = result.RowsAffected()
+	if err != nil {
 		return err
 	}
-	return nil
+	return tx.Commit()
 }
 
 // FlushUserRefreshTokens deletes all refresh tokens for a user
-func (rts *RefreshTokenService) FlushUserRefreshTokens(userID int) error {
-	// Prepare transaction
-	tx, err := rts.db.Begin()
-	if err != nil {
-		return err
+func (rts *RefreshTokenService) FlushUserRefreshTokens(ctx context.Context, userID int) error {
+	if ctx == nil {
+		ctx = context.Background()
 	}
-	defer tx.Rollback()
-	_, err = tx.Exec(getQuery(flushUserTokens), userID)
-	if err != nil {
-		return err
-	}
-	if err = tx.Commit(); err != nil {
-		return err
-	}
-	return nil
-}
 
-func (rts *RefreshTokenService) FlushUserRefreshTokensWithContext(ctx context.Context, userID int) error {
 	// Prepare transaction
 	tx, err := rts.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	_, err = tx.ExecContext(ctx, getQuery(flushUserTokens), userID)
+	result, err := tx.ExecContext(ctx, getQuery(flushUserTokens), userID)
 	if err != nil {
 		return err
 	}
-	if err = tx.Commit(); err != nil {
+
+	_, err = result.RowsAffected()
+	if err != nil {
 		return err
 	}
-	return nil
+	return tx.Commit()
 }
