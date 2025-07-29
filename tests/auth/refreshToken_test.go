@@ -3,12 +3,13 @@ package auth
 import (
 	"context"
 	"database/sql"
-	"github.com/bcetienne/tools-go-auth/auth"
-	"github.com/testcontainers/testcontainers-go/modules/postgres"
 	"log"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/bcetienne/tools-go-auth/auth"
+	"github.com/testcontainers/testcontainers-go/modules/postgres"
 
 	"github.com/bcetienne/tools-go-auth/lib"
 	_ "github.com/lib/pq"
@@ -84,11 +85,11 @@ func TestMain(m *testing.M) {
 // before each test to ensure their independence.
 func setupService(t *testing.T) *auth.RefreshTokenService {
 	// NewRefreshTokenService will create the schema and table on the first call.
-	service, err := auth.NewRefreshTokenService(db, config)
+	service, err := auth.NewRefreshTokenService(t.Context(), db, config)
 	require.NoError(t, err)
 
 	// We clear the table to ensure the test starts from a clean state.
-	err = service.FlushRefreshTokens()
+	err = service.FlushRefreshTokens(t.Context())
 	require.NoError(t, err)
 
 	return service
@@ -96,7 +97,7 @@ func setupService(t *testing.T) *auth.RefreshTokenService {
 
 func TestNewRefreshTokenService(t *testing.T) {
 	t.Run("Should create schema and table if not exists", func(t *testing.T) {
-		_, err := auth.NewRefreshTokenService(db, config)
+		_, err := auth.NewRefreshTokenService(t.Context(), db, config)
 		require.NoError(t, err)
 
 		// Verify that the schema and table exist
@@ -117,7 +118,7 @@ func TestCreateRefreshToken(t *testing.T) {
 	userID := 123
 
 	t.Run("Should create a refresh token", func(t *testing.T) {
-		refreshToken, err := service.CreateRefreshToken(userID)
+		refreshToken, err := service.CreateRefreshToken(t.Context(), userID)
 
 		require.NoError(t, err)
 		assert.NotNil(t, refreshToken)
@@ -134,11 +135,11 @@ func TestRevokeRefreshToken(t *testing.T) {
 	userID := 456
 
 	// Create a token to revoke
-	refreshToken, err := service.CreateRefreshToken(userID)
+	refreshToken, err := service.CreateRefreshToken(t.Context(), userID)
 	require.NoError(t, err)
 
 	t.Run("should revoke an existing token", func(t *testing.T) {
-		err := service.RevokeRefreshToken(refreshToken.Token, userID)
+		err := service.RevokeRefreshToken(t.Context(), refreshToken.Token, userID)
 		require.NoError(t, err)
 
 		// Verify that it is revoked by checking the revoked_at column
@@ -151,7 +152,7 @@ func TestRevokeRefreshToken(t *testing.T) {
 
 	t.Run("Should not fail if token does not exist", func(t *testing.T) {
 		// The UPDATE query will not affect any rows, so no error will be returned.
-		err = service.RevokeRefreshToken("non-existent-token", userID)
+		err = service.RevokeRefreshToken(t.Context(), "non-existent-token", userID)
 		require.NoError(t, err)
 	})
 }
@@ -161,13 +162,13 @@ func TestRevokeAllUserRefreshTokens(t *testing.T) {
 	userID := 789
 
 	// Create several tokens for the user
-	_, err := service.CreateRefreshToken(userID)
+	_, err := service.CreateRefreshToken(t.Context(), userID)
 	require.NoError(t, err)
-	_, err = service.CreateRefreshToken(userID)
+	_, err = service.CreateRefreshToken(t.Context(), userID)
 	require.NoError(t, err)
 
 	t.Run("should revoke all tokens for a user", func(t *testing.T) {
-		err := service.RevokeAllUserRefreshTokens(userID)
+		err := service.RevokeAllUserRefreshTokens(t.Context(), userID)
 		require.NoError(t, err)
 
 		// Verify that all tokens for this user are revoked
@@ -185,15 +186,15 @@ func TestFlushUserRefreshTokens(t *testing.T) {
 	userID2 := 222
 
 	// Create tokens for two different users
-	_, err := service.CreateRefreshToken(userID1)
+	_, err := service.CreateRefreshToken(t.Context(), userID1)
 	require.NoError(t, err)
-	_, err = service.CreateRefreshToken(userID1)
+	_, err = service.CreateRefreshToken(t.Context(), userID1)
 	require.NoError(t, err)
-	_, err = service.CreateRefreshToken(userID2)
+	_, err = service.CreateRefreshToken(t.Context(), userID2)
 	require.NoError(t, err)
 
 	t.Run("should delete all tokens for a specific user", func(t *testing.T) {
-		err := service.FlushUserRefreshTokens(userID1)
+		err := service.FlushUserRefreshTokens(t.Context(), userID1)
 		require.NoError(t, err)
 
 		// Verify that the tokens for userID1 have been deleted
@@ -217,11 +218,11 @@ func TestVerifyRefreshToken(t *testing.T) {
 	userID := 3
 
 	// Create a valid token
-	rt, err := service.CreateRefreshToken(userID)
+	rt, err := service.CreateRefreshToken(t.Context(), userID)
 	require.NoError(t, err)
 
 	t.Run("should return true for a valid token", func(t *testing.T) {
-		exists, err := service.VerifyRefreshToken(rt.Token)
+		exists, err := service.VerifyRefreshToken(t.Context(), rt.Token)
 		require.NoError(t, err)
 		assert.True(t, *exists)
 	})
