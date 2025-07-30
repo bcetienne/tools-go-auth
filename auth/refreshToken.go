@@ -126,8 +126,9 @@ func (rts *RefreshTokenService) newRefreshToken(userID int) (*model.RefreshToken
 // NewRefreshTokenService initializes the refresh token management service.
 // This function checks for the existence of the required schema and table in the PostgreSQL database.
 // If the schema or table does not exist, they are created automatically.
-//e
+//
 // Parameters:
+//   - ctx: context for the operation
 //   - db: pointer to the SQL database connection
 //   - config: application configuration
 //
